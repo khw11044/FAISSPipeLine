@@ -30,3 +30,24 @@
 2. 2.test.ipynb으로 submit.csv만들고 제출 
 
 3. 1.get_traindata.ipynb은 train데이터로 db만들고 결과 확인 
+
+# 3. colab에서 돌리고 싶다면 
+
+```python
+from google.colab import drive
+drive.mount('/content/drive')
+```
+
+```python
+# 해당 폴더채로 구글 드라이브에 넣고 불러오기 
+%cd drive/MyDrive/2024/LLM_study
+
+!ls
+```
+
+```python
+# Ragpipeline 불러들여서 실험하기 
+# RAGpipeline의 llm만 Huggingface로 바꿔도 된다.
+from utils.RagPipeline import Ragpipeline
+from config import config
+```
