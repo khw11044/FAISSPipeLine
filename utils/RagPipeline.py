@@ -9,8 +9,9 @@ from langchain_community.vectorstores import Chroma
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
-from langchain.retrievers import EnsembleRetriever
+from langchain.retrievers import EnsembleRetriever, MultiQueryRetriever
 from langchain_community.retrievers import BM25Retriever
+from langchain_teddynote.retrievers import KiwiBM25Retriever
 
 import pickle
 
@@ -27,39 +28,51 @@ def format_docs(docs):
 
 
 class Ragpipeline:
-    def __init__(self, source):
+    def __init__(self, source, config):
         # 1. LLM 바꿔보면서 실험하기 
-        self.llm = ChatOllama(model="llama3.1", temperature=0.1)
+        self.llm = ChatOllama(model=config['llm_predictor']['model_name'], temperature=config['llm_predictor']['temperature'])
         # self.llm = ChatOllama(model="llama3-ko-instruct", temperature=0)
         
-        self.base_retriever = self.init_retriever(source)
-        self.ensemble_retriever = self.init_ensemble_retriever(source)
+        self.base_retriever = self.init_retriever(source, config)
+        self.ensemble_retriever = self.init_ensemble_retriever(source, config)
         self.chain = self.init_chain()
         
         
-    def init_retriever(self, source):
+    def init_retriever(self, source, config):
         # vector_store = Chroma(persist_directory=source, embedding_function=get_embedding())
         embeddings_model = get_embedding()
         vector_store = FAISS.load_local(source, embeddings_model, allow_dangerous_deserialization=True)
-        retriever = vector_store.as_retriever(
-                search_type="mmr",                                              # mmr 검색 방법으로 
-                # search_kwargs={'fetch_k': 5, "k": 3, 'lambda_mult': 0.4},      # 상위 10개의 관련 context에서 최종 5개를 추리고 'lambda_mult'는 관련성과 다양성 사이의 균형을 조정하는 파라메타 default 값이 0.5
-                search_kwargs={'fetch_k': 8, "k": 3}, 
-            )
+        
+        if config['search_type']=='mmr':
+            retriever = vector_store.as_retriever(
+                    search_type=config['search_type'],                                              # mmr 검색 방법으로 
+                    # search_kwargs={'fetch_k': 5, "k": 3, 'lambda_mult': 0.4},      # 상위 10개의 관련 context에서 최종 5개를 추리고 'lambda_mult'는 관련성과 다양성 사이의 균형을 조정하는 파라메타 default 값이 0.5
+                    search_kwargs={'fetch_k': config['search_kwargs_k']*2, "k": config['search_kwargs_k'], 'lambda_mult': config['search_kwargs_lambda']}, 
+                )
+        elif config['search_type']=='similarity':
+            retriever = vector_store.as_retriever(
+                    search_type=config['search_type'],                                              # mmr 검색 방법으로 
+                    search_kwargs={"k": config['search_kwargs_k']}, 
+                )
+        else:
+            retriever = vector_store.as_retriever(
+                    search_type=self.config['search_type'],                                              # mmr 검색 방법으로 
+                    search_kwargs={"k": config['search_kwargs_k'], 'score_threshold': config['score_threshold']}, 
+                )
         
         return retriever
     
-    def init_ensemble_retriever(self, source):
+    def init_ensemble_retriever(self, source, config):
         retriever = self.base_retriever
         
         all_docs = pickle.load(open(f'{source}.pkl', 'rb'))
-        bm25_retriever = BM25Retriever.from_documents(all_docs)
-        bm25_retriever.k = 3   
+        bm25_retriever = KiwiBM25Retriever.from_documents(all_docs) # BM25Retriever.from_documents(all_docs)
+        bm25_retriever.k = config['bm25_k']
         
         ensemble_retriever = EnsembleRetriever(
                 retrievers=[bm25_retriever, retriever],
-                weights=[0.4, 0.6],
-                search_type='mmr'
+                weights=config['ensemble_weight'],
+                search_type=config['ensemble_search_type']
             )
         
         return ensemble_retriever
