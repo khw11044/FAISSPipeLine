@@ -3,12 +3,14 @@ config = {
         "model_name": "llama3.1",  
         "temperature": 0
     },
-    
-    "embed_model": "intfloat/multilingual-e5-large",  # "intfloat/multilingual-e5-small", intfloat/multilingual-e5-base, intfloat/multilingual-e5-large
+    # "intfloat/multilingual-e5-small", intfloat/multilingual-e5-base, intfloat/multilingual-e5-large
+    # intfloat/multilingual-e5-large : 0.64
+    # BAAI/bge-m3, 512, 32 : 0.59
+    "embed_model": "BAAI/bge-m3",  
     
     "text_split":{
-        'chunk_size': 512,
-        'chunk_overlap': 32
+        'chunk_size': 1024,
+        'chunk_overlap': 64
     },
     
     "save_data_path": './data',
