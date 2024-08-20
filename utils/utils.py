@@ -154,6 +154,7 @@ def process_pdfs_from_dataframe(df, base_directory, save_path):
 ################################## FAISS로 만들기 Dense and Sparse dataset ##########################################################
 def process_pdfs_from_dataframe_faiss(config, df, base_directory, file_mapping, save_path = config['save_data_path']):
     """딕셔너리에 pdf명을 키로해서 DB, retriever 저장"""
+    save_path = config['save_data_path']
     os.makedirs(save_path, exist_ok=True)
     
     
@@ -171,7 +172,7 @@ def process_pdfs_from_dataframe_faiss(config, df, base_directory, file_mapping, 
         # PDF 처리 및 벡터 DB 생성
         if config['pdf_loader'] == 'pymupdf4llm':
             chunks = process_pdf1(config, full_path)
-        elif config['pdf_loader'] == 'pymupdf4llm':
+        elif config['pdf_loader'] == 'fitz':
             chunks = process_pdf_fitz(config, full_path)
         else:
             chunks = process_pdf(config, full_path)

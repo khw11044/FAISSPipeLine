@@ -40,7 +40,7 @@ class Ragpipeline:
         
     def init_retriever(self, source, config):
         # vector_store = Chroma(persist_directory=source, embedding_function=get_embedding())
-        embeddings_model = get_embedding()
+        embeddings_model = get_embedding(config)
         vector_store = FAISS.load_local(source, embeddings_model, allow_dangerous_deserialization=True)
         
         if config['search_type']=='mmr':

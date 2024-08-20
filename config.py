@@ -1,6 +1,6 @@
 config = {
     "llm_predictor": {
-        "model_name": "llama3.1",   # llama3.1-dacon-Q8:latest
+        "model_name": "llama3.1-dacon-Q8:latest",   # llama3.1-dacon-Q8:latest,  llama3.1
         "temperature": 0
     },
     # "intfloat/multilingual-e5-small", intfloat/multilingual-e5-base, intfloat/multilingual-e5-large
@@ -8,7 +8,7 @@ config = {
     "embed_model": "intfloat/multilingual-e5-large",  
     
     # pymupdf4llm, fitz, PyPDFLoader, PyMuPDFLoader, UnstructuredPDFLoader, PDFPlumberLoader, PyPDFDirectoryLoader
-    "pdf_loader": "PyPDFLoader", 
+    "pdf_loader": "pymupdf4llm", 
     
     "text_split":{
         'chunk_size': 512,
