@@ -28,12 +28,21 @@ import pickle
 
 from config import config
 
+
+pdfloaders = {
+    "PyPDFLoader": PyPDFLoader,
+    "PyMuPDFLoader":PyMuPDFLoader,
+    "UnstructuredPDFLoader": UnstructuredPDFLoader,
+    "PDFPlumberLoader": PDFPlumberLoader,
+    "PyPDFDirectoryLoader": PyPDFDirectoryLoader
+}
+
 def normalize_path(path):
     """경로 유니코드 정규화"""
     return unicodedata.normalize('NFC', path)
 
 ################################## 1. PDF 처리 방법 실험하기 ##########################################################
-def process_pdf_fitz(file_path, chunk_size=512, chunk_overlap=32):
+def process_pdf_fitz(config, file_path):
     """PDF 텍스트 추출 후 chunk 단위로 나누기"""
     # PDF 파일 열기
     doc = fitz.open(file_path)
@@ -43,18 +52,19 @@ def process_pdf_fitz(file_path, chunk_size=512, chunk_overlap=32):
         text += page.get_text()
     # 텍스트를 chunk로 분할
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap
+        chunk_size=config['text_split']['chunk_size'],
+        chunk_overlap=config['text_split']['chunk_overlap']
     )
     chunk_temp = splitter.split_text(text)
     # Document 객체 리스트 생성
     chunks = [Document(page_content=t) for t in chunk_temp]
     return chunks
 
-def process_pdf(file_path):
+def process_pdf(config, file_path):
     """PDF 텍스트 추출 후 chunk 단위로 나누기"""
     # PDF 파일 열기
-    loader = PDFPlumberLoader(file_path)
+    loader = pdfloaders[config["pdf_loader"]](file_path)
+    # loader = PDFPlumberLoader(file_path)
 
     # 텍스트를 chunk로 분할
     splitter = RecursiveCharacterTextSplitter(
@@ -65,7 +75,7 @@ def process_pdf(file_path):
 
     return chunks
 
-def process_pdf1(file_path):
+def process_pdf1(config, file_path):
     md_text = pymupdf4llm.to_markdown(file_path)
     
     headers_to_split_on = [
@@ -87,7 +97,7 @@ def process_pdf1(file_path):
 
 
 ################################## 2. 임베딩모델 바꿔보기 ##########################################################
-def get_embedding():
+def get_embedding(config):
     # 임베딩 모델 설정
     model_path = config['embed_model']
     model_kwargs = {'device': 'cuda'}
@@ -110,10 +120,10 @@ def create_chroma_db(pdf_title, chunks):
 
     
 ################################## 3. Chroma로 할건지, FAISS로 할건지 등 ##########################################################
-def create_faiss_db(save_file, chunks):
+def create_faiss_db(config, save_file, chunks):
     """Chroma DB 생성"""
     # 임베딩 모델 설정
-    embeddings = get_embedding()
+    embeddings = get_embedding(config)
     # Chroma DB 생성 및 반환 persist_directory=DB_PATH
     db = FAISS.from_documents(chunks, embedding=embeddings, distance_strategy = DistanceStrategy.COSINE)
     db.save_local(save_file)
@@ -142,9 +152,8 @@ def process_pdfs_from_dataframe(df, base_directory, save_path):
             
             
 ################################## FAISS로 만들기 Dense and Sparse dataset ##########################################################
-def process_pdfs_from_dataframe_faiss(df, base_directory, file_mapping):
+def process_pdfs_from_dataframe_faiss(config, df, base_directory, file_mapping, save_path = config['save_data_path']):
     """딕셔너리에 pdf명을 키로해서 DB, retriever 저장"""
-    save_path = config['save_data_path']
     os.makedirs(save_path, exist_ok=True)
     
     
@@ -160,9 +169,14 @@ def process_pdfs_from_dataframe_faiss(df, base_directory, file_mapping):
         print(f"Processing {pdf_title}...")
         
         # PDF 처리 및 벡터 DB 생성
-        chunks = process_pdf1(full_path)
+        if config['pdf_loader'] == 'pymupdf4llm':
+            chunks = process_pdf1(config, full_path)
+        elif config['pdf_loader'] == 'pymupdf4llm':
+            chunks = process_pdf_fitz(config, full_path)
+        else:
+            chunks = process_pdf(config, full_path)
         new_title = file_mapping[pdf_title]
         save_file = f'{save_path}/{new_title}'
-        create_faiss_db(save_file, chunks)
+        create_faiss_db(config, save_file, chunks)
         with open(f'{save_file}.pkl', 'wb') as f:
             pickle.dump(chunks, f)
