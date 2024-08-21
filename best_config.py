@@ -5,6 +5,8 @@ config = {
     },
     "embed_model": "intfloat/multilingual-e5-large",  
     
+    
+    "pdf_loader": "pymupdf4llm", 
     "text_split":{
         'chunk_size': 512,
         'chunk_overlap': 32

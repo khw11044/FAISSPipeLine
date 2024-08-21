@@ -13,6 +13,8 @@ from langchain_community.document_loaders import UnstructuredPDFLoader
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 import pymupdf4llm
+import pymupdf
+import pdfplumber
 
 
 # Langchain 관련
@@ -25,8 +27,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter, MarkdownText
 from langchain_community.vectorstores.utils import DistanceStrategy
 
 import pickle
-
-from config import config
 
 
 pdfloaders = {
@@ -75,7 +75,7 @@ def process_pdf(config, file_path):
 
     return chunks
 
-def process_pdf1(config, file_path):
+def process_pymupdf4llm(config, file_path):
     md_text = pymupdf4llm.to_markdown(file_path)
     
     headers_to_split_on = [
@@ -95,6 +95,30 @@ def process_pdf1(config, file_path):
     splits = text_splitter.split_documents(md_chunks)
     return splits
 
+def process_pdfplumber(config, file_path):
+    md_text = ""
+    with pdfplumber.open(file_path) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if text:
+                md_text += text + "\n"
+    
+    headers_to_split_on = [
+        ("#", "Header 1"),
+        ("##", "Header 2"),
+        ("###", "Header 3"),
+    ]
+
+    md_header_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on, strip_headers=False)
+    md_chunks = md_header_splitter.split_text(md_text)
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=config['text_split']['chunk_size'],
+        chunk_overlap=config['text_split']['chunk_overlap']
+    )
+
+    splits = text_splitter.split_documents(md_chunks)
+    return splits
 
 ################################## 2. 임베딩모델 바꿔보기 ##########################################################
 def get_embedding(config):
@@ -152,7 +176,7 @@ def process_pdfs_from_dataframe(df, base_directory, save_path):
             
             
 ################################## FAISS로 만들기 Dense and Sparse dataset ##########################################################
-def process_pdfs_from_dataframe_faiss(config, df, base_directory, file_mapping, save_path = config['save_data_path']):
+def process_pdfs_from_dataframe_faiss(config, df, base_directory, file_mapping, save_path = './data'):
     """딕셔너리에 pdf명을 키로해서 DB, retriever 저장"""
     save_path = config['save_data_path']
     os.makedirs(save_path, exist_ok=True)
@@ -171,9 +195,11 @@ def process_pdfs_from_dataframe_faiss(config, df, base_directory, file_mapping, 
         
         # PDF 처리 및 벡터 DB 생성
         if config['pdf_loader'] == 'pymupdf4llm':
-            chunks = process_pdf1(config, full_path)
+            chunks = process_pymupdf4llm(config, full_path)
         elif config['pdf_loader'] == 'fitz':
             chunks = process_pdf_fitz(config, full_path)
+        elif config['pdf_loader'] == 'pdfplumber':
+            chunks = process_pdfplumber(config, full_path)
         else:
             chunks = process_pdf(config, full_path)
         new_title = file_mapping[pdf_title]
